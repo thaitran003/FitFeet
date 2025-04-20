@@ -6,9 +6,8 @@ const jwt = require("jsonwebtoken");
 const multer = require("multer");
 const path = require("path");
 const cors = require("cors");
-const { log } = require("console");
-const { type } = require("os");
-const { METHODS } = require("http");
+const { default: axios } = require("axios");
+const bodyParser = require('body-parser');
 const corsConfig = {
   origin: "*",
   credentials: true,
@@ -17,12 +16,13 @@ const corsConfig = {
 
 app.use(express.json());
 app.use(cors(corsConfig));
+app.use(bodyParser.urlencoded({ extended: false }));
 
 
 
 //Database connection
 mongoose.connect(
-  "mongodb+srv://ecommerceMern:user123@cluster0.nrdblkk.mongodb.net/ecommerce-mern?retryWrites=true&w=majority&appName=Cluster0"
+  "mongodb://localhost:27017/"
 );
 
 app.get("/", (req, res) => {
@@ -39,13 +39,41 @@ const storage = multer.diskStorage({
 
 const upload = multer({ storage: storage });
 
-//upload image endpoint
 app.use("/images", express.static("upload/images"));
-app.post("/upload", upload.single("product"), (req, res) => {
-  res.json({
-    success: 1,
-    image_url: `http://localhost:${port}/images/${req.file.filename}`,
-  });
+app.post("/upload", upload.single("product"), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: 0,
+        message: "No file uploaded",
+      });
+    }
+
+    const formData = {
+      file: req.file.path,
+      fileName: req.file.filename,
+    };
+
+    const { data } = await axios.post(
+      "https://upload.imagekit.io/api/v2/files/upload",
+      formData,
+      {
+        headers: {
+          Authorization: "Basic cHJpdmF0ZV9XVEJvUWJseXI2L1IyTllNUGVGNVhNNmZwVE09Og==",
+          "Content-Type": "multipart/form-data",
+        },
+      }
+    );
+    res.json({
+      success: 1,
+      image_url: data.url,
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: 0,
+      message: "Failed to upload image",
+    });
+  }
 });
 
 //schema for creating products
